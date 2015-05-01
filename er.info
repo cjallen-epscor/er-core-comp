@@ -1,0 +1,43 @@
+; $Id$
+name = EPSCoR Reporting
+description = A custom module designed to handle reporting tasks.
+version = "7.x-3.1"
+core = "7.x"
+project = “epscor_reporting”
+package = "EPSCoR"
+
+; we need date_views and date_popup for the summary table specifically.
+; Please keep the following list sorted.
+; Did you make a change to this list?  If so, please change INSTALL.html also.
+dependencies[] = bundle_copy
+dependencies[] = computed_field
+dependencies[] = ctools
+dependencies[] = date
+dependencies[] = date_api
+dependencies[] = date_popup
+dependencies[] = date_repeat_field
+dependencies[] = date_views
+dependencies[] = entity
+dependencies[] = entity_token
+dependencies[] = entityreference
+dependencies[] = entityreference_prepopulate
+dependencies[] = field_group
+dependencies[] = field_permissions
+dependencies[] = flag
+dependencies[] = libraries
+dependencies[] = link
+dependencies[] = markup
+dependencies[] = nodeaccess_userreference
+dependencies[] = page_manager
+dependencies[] = php
+dependencies[] = rules
+dependencies[] = rules_admin
+dependencies[] = rules_scheduler
+dependencies[] = select_or_other
+dependencies[] = views
+dependencies[] = views_content
+dependencies[] = views_data_export
+dependencies[] = views_php
+dependencies[] = views_ui
+
+files[] = tests/nsf-tables.test

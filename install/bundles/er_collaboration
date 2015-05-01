@@ -1,0 +1,497 @@
+<?php
+$data = array(
+  'bundles' => array(
+    'er_collaboration' => (object) array(
+      'type' => 'er_collaboration',
+      'name' => 'Collaboration',
+      'base' => 'node_content',
+      'module' => 'node',
+      'description' => 'A collaboration is a set of activities leading to a definable outcome such as shared use of data, presentation of results, publications, patents, outreach, etc.',
+      'help' => '',
+      'has_title' => '1',
+      'title_label' => 'Title',
+      'custom' => '1',
+      'modified' => '1',
+      'locked' => '0',
+      'disabled' => '0',
+      'orig_type' => 'er_collaboration',
+      'disabled_changed' => FALSE,
+      'bc_entity_type' => 'node',
+    ),
+  ),
+  'fields' => array(
+    'body' => array(
+      'entity_types' => array(
+        0 => 'node',
+      ),
+      'foreign keys' => array(
+        'format' => array(
+          'table' => 'filter_format',
+          'columns' => array(
+            'format' => 'format',
+          ),
+        ),
+      ),
+      'indexes' => array(
+        'format' => array(
+          0 => 'format',
+        ),
+      ),
+      'settings' => array(),
+      'translatable' => '1',
+      'storage' => array(
+        'type' => 'field_sql_storage',
+        'settings' => array(),
+        'module' => 'field_sql_storage',
+        'active' => '1',
+        'details' => array(
+          'sql' => array(
+            'FIELD_LOAD_CURRENT' => array(
+              'field_data_body' => array(
+                'value' => 'body_value',
+                'summary' => 'body_summary',
+                'format' => 'body_format',
+              ),
+            ),
+            'FIELD_LOAD_REVISION' => array(
+              'field_revision_body' => array(
+                'value' => 'body_value',
+                'summary' => 'body_summary',
+                'format' => 'body_format',
+              ),
+            ),
+          ),
+        ),
+      ),
+      'field_permissions' => array(
+        'type' => '0',
+      ),
+      'field_name' => 'body',
+      'type' => 'text_with_summary',
+      'module' => 'text',
+      'active' => '1',
+      'locked' => '0',
+      'cardinality' => '1',
+      'deleted' => '0',
+      'columns' => array(
+        'value' => array(
+          'type' => 'text',
+          'size' => 'big',
+          'not null' => FALSE,
+        ),
+        'summary' => array(
+          'type' => 'text',
+          'size' => 'big',
+          'not null' => FALSE,
+        ),
+        'format' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => FALSE,
+        ),
+      ),
+      'bundles' => array(
+        'node' => array(
+          0 => 'page',
+          1 => 'article',
+          2 => 'er_event',
+          3 => 'er_presentation',
+          4 => 'er_award',
+          5 => 'er_collaboration',
+          6 => 'er_institution',
+          7 => 'er_publication',
+          8 => 'er_proposal',
+        ),
+      ),
+    ),
+    'field_er_collaboration_dates' => array(
+      'translatable' => '0',
+      'entity_types' => array(),
+      'settings' => array(
+        'granularity' => array(
+          'month' => 'month',
+          'year' => 'year',
+          'day' => 0,
+          'hour' => 0,
+          'minute' => 0,
+          'second' => 0,
+        ),
+        'tz_handling' => 'none',
+        'timezone_db' => '',
+        'cache_enabled' => 0,
+        'cache_count' => '4',
+        'repeat' => '0',
+        'todate' => 'optional',
+      ),
+      'storage' => array(
+        'type' => 'field_sql_storage',
+        'settings' => array(),
+        'module' => 'field_sql_storage',
+        'active' => '1',
+        'details' => array(
+          'sql' => array(
+            'FIELD_LOAD_CURRENT' => array(
+              'field_data_field_er_collaboration_dates' => array(
+                'value' => 'field_er_collaboration_dates_value',
+                'value2' => 'field_er_collaboration_dates_value2',
+              ),
+            ),
+            'FIELD_LOAD_REVISION' => array(
+              'field_revision_field_er_collaboration_dates' => array(
+                'value' => 'field_er_collaboration_dates_value',
+                'value2' => 'field_er_collaboration_dates_value2',
+              ),
+            ),
+          ),
+        ),
+      ),
+      'foreign keys' => array(),
+      'indexes' => array(),
+      'field_permissions' => array(
+        'type' => '0',
+      ),
+      'field_name' => 'field_er_collaboration_dates',
+      'type' => 'date',
+      'module' => 'date',
+      'active' => '1',
+      'locked' => '0',
+      'cardinality' => '1',
+      'deleted' => '0',
+      'columns' => array(
+        'value' => array(
+          'type' => 'varchar',
+          'length' => 20,
+          'not null' => FALSE,
+          'sortable' => TRUE,
+          'views' => TRUE,
+        ),
+        'value2' => array(
+          'type' => 'varchar',
+          'length' => 20,
+          'not null' => FALSE,
+          'sortable' => TRUE,
+          'views' => FALSE,
+        ),
+      ),
+      'bundles' => array(
+        'node' => array(
+          0 => 'er_collaboration',
+        ),
+      ),
+    ),
+    'field_er_components' => array(
+      'translatable' => '0',
+      'entity_types' => array(),
+      'settings' => array(
+        'target_type' => 'taxonomy_term',
+        'handler' => 'views',
+        'handler_settings' => array(
+          'view' => array(
+            'view_name' => 'er_components',
+            'display_name' => 'entityreference_1',
+            'args' => array(),
+          ),
+          'behaviors' => array(
+            'views-select-list' => array(
+              'status' => 0,
+            ),
+          ),
+        ),
+        'profile2_private' => 0,
+        'user_role_field' => array(
+          5 => '5',
+          4 => '4',
+          6 => 0,
+          3 => 0,
+          1 => 0,
+          2 => 0,
+        ),
+        'handler_submit' => 'Change handler',
+      ),
+      'storage' => array(
+        'type' => 'field_sql_storage',
+        'settings' => array(),
+        'module' => 'field_sql_storage',
+        'active' => '1',
+        'details' => array(
+          'sql' => array(
+            'FIELD_LOAD_CURRENT' => array(
+              'field_data_field_er_components' => array(
+                'target_id' => 'field_er_components_target_id',
+              ),
+            ),
+            'FIELD_LOAD_REVISION' => array(
+              'field_revision_field_er_components' => array(
+                'target_id' => 'field_er_components_target_id',
+              ),
+            ),
+          ),
+        ),
+      ),
+      'foreign keys' => array(
+        'taxonomy_term_data' => array(
+          'table' => 'taxonomy_term_data',
+          'columns' => array(
+            'target_id' => 'tid',
+          ),
+        ),
+      ),
+      'indexes' => array(
+        'target_id' => array(
+          0 => 'target_id',
+        ),
+      ),
+      'field_permissions' => array(
+        'type' => '0',
+      ),
+      'field_name' => 'field_er_components',
+      'type' => 'entityreference',
+      'module' => 'entityreference',
+      'active' => '1',
+      'locked' => '0',
+      'cardinality' => '-1',
+      'deleted' => '0',
+      'columns' => array(
+        'target_id' => array(
+          'description' => 'The id of the target entity.',
+          'type' => 'int',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+        ),
+      ),
+      'bundles' => array(
+        'node' => array(
+          0 => 'er_news',
+          1 => 'er_collaboration',
+        ),
+        'user' => array(
+          0 => 'user',
+        ),
+      ),
+    ),
+    'field_markup_cnp_definition' => array(
+      'translatable' => '0',
+      'entity_types' => array(),
+      'settings' => array(
+        'markup' => array(
+          'value' => '<font size="+1">Definition:  A collaboration is a set of activities leading to a definable outcome such as shared use of data, presentation of results, publications, patents, outreach, etc.</font>',
+          'format' => 'full_html',
+        ),
+        'profile2_private' => FALSE,
+      ),
+      'storage' => array(
+        'type' => 'field_sql_storage',
+        'settings' => array(),
+        'module' => 'field_sql_storage',
+        'active' => '1',
+        'details' => array(),
+      ),
+      'foreign keys' => array(),
+      'indexes' => array(),
+      'field_permissions' => array(
+        'type' => '0',
+      ),
+      'field_name' => 'field_markup_cnp_definition',
+      'type' => 'markup',
+      'module' => 'markup',
+      'active' => '1',
+      'locked' => '0',
+      'cardinality' => '1',
+      'deleted' => '0',
+      'columns' => array(),
+      'bundles' => array(
+        'node' => array(
+          0 => 'er_collaboration',
+        ),
+      ),
+    ),
+  ),
+  'instances' => array(
+    'body' => array(
+      0 => array(
+        'label' => 'Description of Collaboration',
+        'widget' => array(
+          'weight' => '12',
+          'type' => 'text_textarea_with_summary',
+          'module' => 'text',
+          'active' => 1,
+          'settings' => array(
+            'rows' => '20',
+            'summary_rows' => 5,
+          ),
+        ),
+        'settings' => array(
+          'text_processing' => '1',
+          'display_summary' => 0,
+          'user_register_form' => FALSE,
+        ),
+        'display' => array(
+          'default' => array(
+            'label' => 'above',
+            'type' => 'text_default',
+            'weight' => '17',
+            'settings' => array(),
+            'module' => 'text',
+          ),
+          'teaser' => array(
+            'label' => 'above',
+            'type' => 'text_default',
+            'weight' => '1',
+            'settings' => array(),
+            'module' => 'text',
+          ),
+        ),
+        'required' => 1,
+        'description' => '',
+        'default_value' => NULL,
+        'field_name' => 'body',
+        'entity_type' => 'node',
+        'bundle' => 'er_collaboration',
+        'deleted' => '0',
+      ),
+    ),
+    'field_er_collaboration_dates' => array(
+      0 => array(
+        'label' => 'Dates',
+        'widget' => array(
+          'weight' => '11',
+          'type' => 'date_popup',
+          'module' => 'date',
+          'active' => 1,
+          'settings' => array(
+            'input_format' => 'm/d/Y - H:i:s',
+            'input_format_custom' => '',
+            'year_range' => '-3:+3',
+            'increment' => '15',
+            'label_position' => 'above',
+            'text_parts' => array(),
+            'repeat_collapsed' => 0,
+            'display_all_day' => 0,
+          ),
+        ),
+        'settings' => array(
+          'default_value' => 'now',
+          'default_value_code' => '',
+          'default_value2' => 'same',
+          'default_value_code2' => '',
+          'user_register_form' => FALSE,
+        ),
+        'display' => array(
+          'default' => array(
+            'label' => 'above',
+            'type' => 'date_custom',
+            'weight' => '11',
+            'settings' => array(),
+            'module' => 'er',
+          ),
+          'teaser' => array(
+            'label' => 'above',
+            'type' => 'date_default',
+            'weight' => '0',
+            'settings' => array(
+              'format_type' => 'long',
+              'multiple_number' => '',
+              'multiple_from' => '',
+              'multiple_to' => '',
+              'fromto' => 'both',
+              'show_repeat_rule' => 'show',
+            ),
+            'module' => 'date',
+          ),
+        ),
+        'required' => 1,
+        'description' => '',
+        'field_name' => 'field_er_collaboration_dates',
+        'entity_type' => 'node',
+        'bundle' => 'er_collaboration',
+        'deleted' => '0',
+      ),
+    ),
+    'field_er_components' => array(
+      0 => array(
+        'label' => 'Project Component',
+        'widget' => array(
+          'weight' => '2',
+          'type' => 'options_buttons',
+          'module' => 'options',
+          'active' => 1,
+          'settings' => array(),
+        ),
+        'settings' => array(
+          'user_register_form' => FALSE,
+        ),
+        'display' => array(
+          'default' => array(
+            'label' => 'above',
+            'type' => 'entityreference_label',
+            'weight' => '16',
+            'settings' => array(
+              'link' => FALSE,
+            ),
+            'module' => 'entityreference',
+          ),
+          'teaser' => array(
+            'label' => 'above',
+            'type' => 'entityreference_label',
+            'weight' => '2',
+            'settings' => array(
+              'link' => FALSE,
+            ),
+            'module' => 'entityreference',
+          ),
+        ),
+        'required' => 1,
+        'description' => '',
+        'default_value' => NULL,
+        'field_name' => 'field_er_components',
+        'entity_type' => 'node',
+        'bundle' => 'er_collaboration',
+        'deleted' => '0',
+      ),
+    ),
+    'field_markup_cnp_definition' => array(
+      0 => array(
+        'label' => 'markup_CnP_definition',
+        'widget' => array(
+          'weight' => '1',
+          'type' => 'markup',
+          'module' => 'markup',
+          'active' => 0,
+          'settings' => array(),
+        ),
+        'settings' => array(
+          'required_by_role' => array(
+            5 => 0,
+            4 => 0,
+            6 => 0,
+            3 => 0,
+            1 => 0,
+          ),
+          'user_register_form' => FALSE,
+        ),
+        'display' => array(
+          'default' => array(
+            'label' => 'above',
+            'type' => 'markup_default',
+            'weight' => '15',
+            'settings' => array(),
+            'module' => 'markup',
+          ),
+          'teaser' => array(
+            'label' => 'above',
+            'type' => 'hidden',
+            'weight' => '3',
+            'settings' => array(),
+          ),
+        ),
+        'required' => 0,
+        'description' => '',
+        'default_value' => NULL,
+        'field_name' => 'field_markup_cnp_definition',
+        'entity_type' => 'node',
+        'bundle' => 'er_collaboration',
+        'deleted' => '0',
+      ),
+    ),
+  ),
+);

@@ -1,0 +1,1056 @@
+<?php
+define('ER_DEBUG_EXCEL', 0); //Change this to True (1) in order to debug the excel downloads.
+
+define('ER_ADMIN_PERMISSION','administer er');
+define('ER_ADMIN_ACCESS_PERMISSION','access er admin content');
+define('ER_ACCESS_PERMISSION','access er content');
+define('ER_DOWNLOAD_PERMISSION','download er content');
+
+define('ER_ROOT_NAME', 'reporting');//The name used in the URI
+
+// Brent's comment: testing git workflow...
+
+//Start date of the grant, currently used in the accomplishments table (summary.inc).
+//DEPRECATED:: Use variable_get('er_start_date') instead.
+//define('ER_START_DATE', mktime(0, 0, 0, 9, 15, 2009));
+
+define('ER_MODULE_DIR', drupal_get_path('module', 'er'));
+define('ER_INSTALL_DIR', ER_MODULE_DIR . '/install');
+define('ER_INCLUDES_DIR', ER_MODULE_DIR . '/includes');
+
+define('ER_DATE_FORMAT', "m/j/Y");
+
+require_once ER_MODULE_DIR . '/includes/form_logic.inc';
+require_once ER_MODULE_DIR . '/includes/node_logic.inc';
+require_once ER_MODULE_DIR . '/includes/theme.inc';
+require_once ER_MODULE_DIR . '/includes/views.inc';
+require_once ER_MODULE_DIR . '/includes/blocks.inc';
+
+//We should probably only load this when it is necessary:
+require_once ER_MODULE_DIR . '/includes/er.install.inc';
+
+
+//This handles the accomplishments table...
+require_once ER_MODULE_DIR . '/includes/accomplishments.inc';
+
+//IMPORTANT NOTE FROM module_load_include DOCUMENTATION:
+//Do not use this function in a global context since it requires Drupal to be fully bootstrapped,
+// use require_once DRUPAL_ROOT . '/path/file' instead.
+
+/*******************************************************************************
+ * Hook Functions (Drupal)
+ ******************************************************************************/
+ 
+function er_init(){
+	// This is a new comment.
+	// This is a more accurate comment.
+	// Uncomment out the below two lines to get error reporting in case of WSOD ~Mike
+	// error_reporting(E_ALL | E_STRICT);
+	// the line below will get rid of benign "notice" messages that do not look good during a demo
+	error_reporting(E_ALL & ~E_NOTICE);
+	ini_set("display_errors", 1);	
+	$start_date = variable_get('er_start_date');
+	//drupal_add_js('var jQueryOriginal = jQuery;','inline'); //keeps a reference to the original version of jquery.
+	//drupal_add_js(ER_MODULE_DIR.'/static/js/jquery-1.8.0.min.js'); //brings in the new version...
+	//drupal_add_js('var jQueryNew = jQuery.noConflict(), jQuery = jQueryOriginal;', 'inline'); //sets up jQueryNew, and restores the jQuery variable to the old version.
+	drupal_add_js(array('er'=>array('start_date'=>mktime(0, 0, 0, $start_date['month'], $start_date['day'], $start_date['year']))), 'setting'); //tells javascript about the start date of the grant.
+	drupal_add_js(ER_MODULE_DIR.'/static/js/custom.js');
+	drupal_add_js(ER_MODULE_DIR.'/static/js/bootstrap.js'); 
+	drupal_add_css(ER_MODULE_DIR.'/static/css/er.css'); //adds some module specific themeing...
+	drupal_add_css(ER_MODULE_DIR.'/static/css/bootstrap.css'); //adds in cool little icons
+  
+	//dsm(memory_get_usage(true));
+  // print 'Memory usage: ' . (memory_get_usage(true)/1048576) . 'MB (this is a debug message, see er.module:47)';
+}
+
+/**
+ * Display help and module information
+ *  This hook adds documentation to various pages, and defines the main ER Core Help texts
+ * @param which $path
+ * @param array $arg
+ * @internal param \which $path path of the site we're displaying help
+ * @internal param array $arg that holds the current path as would be returned from arg() function
+ * @return help text for the path
+ */
+function er_help($path, $arg) {
+//	d($path, '$path');
+//	d($arg, '$arg');
+	
+	switch ($path) {
+		case 'reporting':
+			return '<strong>Notice:</strong> If you select a date range below, the accomplishments table will show only the content from that period. Also note that this date range also affects the <em>EPSCoR Reporting Core Tables</em> downloads.';
+		case 'user/%/edit':
+			return _make_documentation_link('user');
+    case 'admin/help#er'://This path is special, note the "#" ... see the hook_help docs for info.
+      return theme('er_help_admin');
+  }
+	
+	//Add a help link to every er-core form.
+	if ($arg[0] == 'node' && $arg[1] == 'add' && substr($arg[2], 0, 3) == 'er-'){
+		switch ($arg[2]) {
+			case 'er-collaborators':
+				return _make_documentation_link('er-collaboration');
+			case 'er-collaboration':
+			case 'er-engagement':
+			case 'er-proposal':
+			case 'er-event':
+				return _make_documentation_link($arg[2]);
+			default:
+				return _make_documentation_link('other-cts');
+		}
+	}
+}
+
+function _make_documentation_link($ct){
+	return '<span class="er-documentation-notification">Notice: You may want to read the ' . l('Documentation', 'admin/epscor/user-guide', array('fragment'=>"$ct")) .  ' related to this form.</span>';
+}
+
+/**
+ * Valid permissions for this module
+ * @return array An array of valid permissions for the er module
+ */
+function er_permission(){
+	return array(
+		ER_ADMIN_PERMISSION=>array(
+			'title' => t('Administer EPSCoR Module')
+		),
+		ER_ADMIN_ACCESS_PERMISSION=>array(
+			'title' => t('Access EPSCoR Module Admin content')
+		),
+		ER_ACCESS_PERMISSION=>array(
+			'title' => t('Access EPSCoR Module content')
+		),
+		ER_DOWNLOAD_PERMISSION=>array(
+			'title' => t('Access EPSCoR Module excel sheets'),
+			'description' => t('Display the download NSF table link on the Accomplishments tab')
+		),
+	);
+} // function er_perm()
+
+//function er_menu_link_alter(&$item) {
+//	d($item, '$item');
+//}
+
+/**
+ * Menu for this module
+ * @return array An array with this module's settings.
+ */
+function er_menu() {
+// this is where we hardcode the EPSCoR menu system
+	$items = array();
+	//This sets up the EPSCoR Menu in the administration bar.
+	$items['admin/epscor'] = array(
+		'menu_name' => 'management',
+		'title' => 'EPSCoR',
+		'description' => 'EPSCoR Reporting',
+		'page callback' => 'system_admin_menu_block_page',
+		'access arguments' => array('access administration pages'),
+		'file' => 'system.admin.inc',
+		'file path' => drupal_get_path('module', 'system'),
+		'weight' => '-49',
+	);
+	//EPSCoR Content Menu, accomplishments table views point here
+	$items['admin/epscor/content'] = array(
+		'menu_name' => 'management',
+		'title' => 'EPSCoR Content',
+		'description' => 'All EPSCoR related content types that come with the ER-Core module in populating the reporting tables are located in EPSCoR Content. ',
+		'page callback' => 'system_admin_menu_block_page',
+		'access arguments' => array('access administration pages'),
+		'file' => 'system.admin.inc',
+		'file path' => drupal_get_path('module', 'system'),
+	);
+	//Administration views point here
+	$items['admin/epscor/views'] = array(
+		'menu_name' => 'management',
+		'title' => 'Admin Views',
+		'description' => 'At a glance EPSCoR generated reporting views related to NSF Reporting Tables are available here. In addition, other views such as flagged items for review are available in this menu flyout.',
+		'page callback' => 'system_admin_menu_block_page',
+		'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+		'file' => 'system.admin.inc',
+		'file path' => drupal_get_path('module', 'system'),
+	);
+	
+	//Administrative actions menu
+	$items['admin/epscor/actions'] = array(
+		'menu_name' => 'management',
+		'title' => 'Admin Actions',
+		'description' => 'Administrative actions for site administrators and administrative staff.',
+		'page callback' => 'system_admin_menu_block_page',
+		'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+		'file' => 'system.admin.inc',
+		'file path' => drupal_get_path('module', 'system'),
+	);
+	$items['admin/epscor/actions/new-inst'] = array(
+    'menu_name' => 'management',
+    'title' => 'Create New Institution',
+      'description' => 'This page allows administrators to add new institutions.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('node/add/er-institution'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/actions/config'] = array(
+    'menu_name' => 'management',
+    'title' => 'EPSCoR Reporting Core Settings',
+    'description' => 'This area is specific to EPSCoR grant start dates as well as reporting period dates.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('admin/config/epscor/er'),
+    'access arguments' => array(ER_ADMIN_PERMISSION),
+  );
+	
+  // the below may be helpful at some point. basically just made FAPI for a quick add user
+	// $items['admin/epscor/actions/new-user'] = array(
+    // 'menu_name' => 'management',
+    // 'title' => 'Create New User',
+	// 'type' => MENU_NORMAL_ITEM,
+	// 'page callback' => 'drupal_get_form',
+	// 'page arguments' => array('_er_quick_add'),
+	// 'access callback' => TRUE,
+    // 'access arguments' => array(ER_ADMIN_PERMISSION),
+  // );
+	
+
+	$items['admin/epscor/actions/new-user'] = array(
+   'menu_name' => 'management',
+    'title' => 'Create New User',
+   'description' => 'This page allows administrators to register new users.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('admin/people/create'),
+    'access arguments' => array('administer users'),
+  );
+  
+	$items['admin/epscor/actions/rules'] = array(
+    'menu_name' => 'management',
+    'title' => 'Notifications Settings',
+    'description' => 'Notifications are handled by the Rules module in which rules react on selected events on the site. Many of the items marked as "flagged" can be configured here.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('admin/config/workflow/rules'),
+    'access arguments' => array(ER_ADMIN_PERMISSION),
+  );
+	
+	//NSF TABLE VIEWS:
+	$items['admin/epscor/views/salary-support'] = array(
+    'menu_name' => 'management',
+    'title' => 'NSF Table A - Salary Support',
+    'description' => 'This view aims to help you determine where the Salary Support information is coming from.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/salary-support'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/views/participants'] = array(
+    'menu_name' => 'management',
+    'title' => 'NSF Table B - Participants',
+    'description' => 'This view aims to help you determine where the Participant information is coming from.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/participants'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/views/collaborations'] = array(
+    'menu_name' => 'management',
+    'title' => 'NSF Table C - Collaborations',
+    'description' => 'This view aims to help you determine where the Collaborator counts are coming from.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/collaborations'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/views/external-engagement'] = array(
+    'menu_name' => 'management',
+    'title' => 'NSF Table D - External Engagements',
+    'description' => 'This view aims to help you determine where the External Engagement counts are coming from.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/external-engagement'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/views/outputs'] = array(
+    'menu_name' => 'management',
+    'title' => 'NSF Table E - Outputs',
+    'description' => 'This view aims to help you determine where the Outputs counts are coming from.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/outputs'),
+    'access arguments' => array(ER_ADMIN_ACCESS_PERMISSION),
+  );
+	
+	//Links to content views
+	$content_views = array(
+		"calendar"=>"Calendar Events",
+		"collaborations"=>"Collaborations",
+		"collaborators"=>"External Collaborators",
+		"external-engagements"=>"External Engagements",
+		"highlights"=>"Highlights",
+		"awards"=>"Honors and Awards",
+		"institutions"=>"Institutions",
+		"other-research-products"=>"Other Research Products",
+		"participants"=>"Participants",
+		"patents"=>"Patents",
+		"presentations"=>"Presentations",
+		"proposals"=>"Proposal or Grant",
+		"publications"=>"Publications"
+	);
+	foreach ($content_views as $url=>$label){
+		$items['admin/epscor/content/'.$url] = array(
+			'menu_name' => 'management',
+			'title' => $label,
+			'type' => MENU_NORMAL_ITEM,
+			'page callback' => 'drupal_goto',
+			'page arguments' => array($url),
+			'access arguments' => array('access content'),
+		);
+	}
+
+	
+	
+	$items['admin/epscor/reporting'] = array(
+    'menu_name' => 'management',
+    'title' => 'Accomplishments',
+    'description' => 'This page shows all categories of accomplishments (collaborations, grants & proposals, external engagements, etc) with the option of selecting by reporting year/period.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting'),
+    'access arguments' => array(ER_ACCESS_PERMISSION),
+  );
+	$items['admin/epscor/reporting/download'] = array(
+    'menu_name' => 'management',
+    'title' => 'Download Reporting Tables',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('reporting/excel/download'),
+    'access arguments' => array(ER_DOWNLOAD_PERMISSION),
+  );
+	
+	//Link to the ER Core help docs
+//	$items['admin/epscor/help'] = array(
+//    'menu_name' => 'management',
+//    'title' => 'Help Documentation',
+//		'type' => MENU_NORMAL_ITEM,
+//		'page callback' => 'drupal_goto',
+//		'page arguments' => array('admin/help/er'),
+//    'access arguments' => array('access administration pages'),//"Use the administration pages and help"
+//  );
+	
+	$items['admin/epscor/user-guide'] = array(
+    'menu_name' => 'management',
+    'title' => 'User Guide',
+    'description' => 'A reference and guide for the EPSCoR user.',
+    	'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'theme',
+		'page arguments' => array('er_help'),
+    'access arguments' => array('access content'),//"Use the administration pages and help"
+		'weight' => '15',
+  );
+	
+	$items['admin/epscor/admin-guide'] = array(
+    'menu_name' => 'management',
+    'title' => 'Admin Guide',
+    'description' => 'A reference and guide for the Site Administrator and EPSCoR Administrative Staff.',
+		'type' => MENU_NORMAL_ITEM,
+		'page callback' => 'drupal_goto',
+		'page arguments' => array('admin/help/er'),
+    'access arguments' => array('access administration pages'),//"Use the administration pages and help"
+		'weight' => '20',
+  );
+	
+	
+	
+	// Set up the settings page located under Configuration.
+	$items['admin/config/epscor'] = array(
+		'title' => 'EPSCoR',
+		'description' => 'EPSCoR Reporting',
+		'page callback' => 'system_admin_menu_block_page',
+		'access arguments' => array('access administration pages'),
+		'file' => 'system.admin.inc',
+		'file path' => drupal_get_path('module', 'system'),
+	);
+	
+	$items['admin/config/epscor/er'] = array(
+		'title' => 'EPSCoR Reporting Module Settings',
+		'description' => 'Settings which affect the functionality of the EPSCoR Reporting module.',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('er_settings'),
+		'access arguments' => array(ER_ADMIN_PERMISSION),
+		'file' => 'includes/er.admin.inc',
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['admin/config/epscor/status'] = array(
+		'title' => 'EPSCoR Reporting Status Report',
+		'description' => 'This will help verify if the ER Core installed correctly.',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('er_testing'),
+		'access arguments' => array(ER_ADMIN_PERMISSION),
+		'file' => 'includes/er.testing.inc',
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['admin/config/epscor/er/reset/%'] = array(
+		'title' => 'Reset part of er-core',
+		'description' => '',
+		'page callback' => 'er_installer_reset_callback',
+		'page arguments' => array(5, 6),
+		'access arguments' => array(ER_ADMIN_PERMISSION),
+		'file' => 'includes/er.install.inc',
+	);
+
+	// This is the page for the overview. We only need one menu entry for this
+	// because the choice of whether to view it in reporting year or calendar
+	// year is just a view option, and does not need its own path. We can't
+	// use the load arguments for this one, because there is no second item in
+	// the path.
+	$items[ER_ROOT_NAME] = array(
+		'title' => 'Accomplishments',
+		'description' => 'Overview of reporting data',
+		'page callback' => 'er_accomplishments',
+		//'page arguments' => array('summary'),
+		'access arguments' => array(ER_ACCESS_PERMISSION),
+		'type' => MENU_NORMAL_ITEM,
+		'menu_name' => 'main-menu',
+	);
+
+	// For the individual pages we do not want to have to define a menu item for
+	// each one, so we can use a wildcard loader argument (the % item). This will
+	// call the function er_page_load() with the argument passed in via the URL.
+	// So if someone enters the url reporting/collaborations, then Drupal will call
+	// er_page_load("collaborations"). If that returns false, the response will
+	// be 404 not found. If it returns a value (in this case our page class) that
+	// will be passed to our page function.
+	$items[ER_ROOT_NAME.'/%'] = array(
+		'title' => 'View Details',
+		'description' => 'View reporting details',
+		'page callback' => 'er_page',
+		'page arguments' => array(1),
+		'access arguments' => array(ER_ACCESS_PERMISSION),
+		'type' => MENU_CALLBACK,
+	);
+
+	// We also want a download entry for each item, in case we want to allow
+	// certain users to see the summaries, but not to download the excel product.
+	$items[ER_ROOT_NAME.'/%/download'] = array(
+		'title' => 'Download Details',
+		'description' => 'Download reporting details.',
+		'page callback' => 'er_page_download',
+		'page arguments' => array(1),
+		'access arguments' => array(ER_DOWNLOAD_PERMISSION),
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['admin/help/er/feedback'] = array(
+		'title' => 'User Feedback',
+		'description' => 'Provide feedback on the user interface',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('er_feedback_form'),
+		'access arguments' => array(ER_ACCESS_PERMISSION),//maybe different permission for this.
+		'file' => 'includes/er.feedback.inc',
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['admin/people/permissions/roles/export/%'] = array(
+		'title' => 'Export role',
+		'description' => 'Export a role with it\'s permissions.',
+		'page callback' => 'er_export_role',
+		'page arguments' => array(5),
+		'access arguments' => array(ER_ADMIN_PERMISSION),
+		'type' => MENU_NORMAL_ITEM,
+	);
+	
+	$items['user/%/status'] = array(
+		'title' => 'Status',
+		'description' => 'Gives a summary of meta-information about the user.',
+		'page callback' => 'er_user_participating_status',
+		'page arguments' => array(1),
+		'access arguments' => array(ER_ADMIN_PERMISSION),
+		'type' => MENU_LOCAL_TASK,
+	);
+	return $items;
+}
+
+
+/*
+ * This hook determines which pages will use the administrative theme.
+ */
+function er_admin_paths() {
+  return array(
+    'user/*/status' => TRUE,
+  );
+}
+
+//This hook replaces the original node/add page with one that separates the different types of content.
+//See also er/templates/er-content-links.tpl.php, and er/includes/theme.inc
+//Changes in this function require that you flush the menu cache.
+function er_menu_alter(&$items) {
+	$items['node/add']['page callback'] = 'theme';
+	$items['node/add']['page arguments'] = array('er_add_core_content', array('full_view'=>true));
+}
+
+//initializes, then returns an instance of a er_page object which will be defined in an "inc" file ex: /modules/er/pages/_____.inc
+function er_load_page($arg){
+	require_once ER_MODULE_DIR.'/er_page.inc';
+	if (module_load_include('inc', 'er', 'pages/'.$arg)!==false){
+		// Remember that our classes are prefixed with er_
+		$class = 'er_' . str_replace( "-" , "_" , $arg);
+		$class = new $class();
+		return $class;
+	}
+	return false;
+}
+
+//this handles page loading, it uses er_load_page to retrieve the page object which is used to display the page.
+function er_page($arg) {
+	//dsm($arg, 'loading page');
+	if($page = er_load_page($arg)){
+		// Set the title of the page. the drupal_set_title function takes care
+		// of letting the theme know what to put in the TITLE and H1 tags.
+		drupal_set_title($page->title());
+	
+		// Return the HTML content of the page
+		return $page->html();
+	}
+	return drupal_not_found();
+}
+
+//menu hook which procs when trying to download certain excel sheets, ex: /reporting/participants/download
+function er_page_download($arg) {
+	if (($library = libraries_detect('PHPExcel')) && !empty($library['installed']) && libraries_load_files($library)) {// The library is installed, and files are loaded.
+		if($page = er_load_page($arg)){
+			$objPHPExcel = $page->excel();
+			$objPHPExcel->setActiveSheetIndex(0); //initialize to the first page...
+			$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+			//comment these next few blocks if you want to debug the excel system... (shows error messeges)
+			if (!ER_DEBUG_EXCEL){
+				header('Content-Type: application/vnd.ms-excel');
+				header('Content-Disposition: attachment;filename="'.$page->title().'.xls"');
+				header('Cache-Control: max-age=0');
+				$objWriter->save('php://output');
+				module_invoke_all('exit');
+				exit;
+			}
+			return '';
+		}
+	}else {//Libraries had a problem loading PHPExcel...
+		$error = $library['error'];// This contains a short status code of what went wrong, such as 'not found'.
+		$error_message = $library['error message'];// This contains a detailed (localized) error message.
+		drupal_set_message('PHPExcel library error: ' . $error_message, 'error');
+		watchdog('er', $error_message, NULL, WATCHDOG_CRITICAL);
+	}
+	return drupal_not_found();
+}
+
+/* 
+* Implements hook_ctools_plugin_directory -
+* This lets ctools know to scan my module for a content_type plugin file
+* Detailed docks in ctools/ctools.api.php 
+* See also: http://drupalcontrib.org/api/drupal/contributions--ctools--ctools.api.php/function/hook_ctools_plugin_directory/6
+*/ 
+function er_ctools_plugin_directory($module, $plugin) {
+  if ($module == 'ctools' || $module == 'panels' || $module == 'entityreference') {
+    return 'plugins/' . $plugin;
+  }
+}
+
+///**
+// * Implements hook_ctools_plugin_type().
+// */
+//function er_ctools_plugin_type() {
+//  $plugins['selection'] = array(
+//    'classes' => array('class'),
+//  );
+//  //$plugins['behavior'] = array(
+//  //  'classes' => array('class'),
+//  //  'process' => 'entityreference_behavior_plugin_process',
+//  //);
+//  return $plugins;
+//}
+
+/**
+ * Implements hook_ctools_plugin_api().
+ */
+function er_ctools_plugin_api($module, $api) {
+  if ($module == 'panels' && $api == 'styles') {
+    // Check and return correct style version
+    return array('version' => 2);
+  }
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function er_views_api() {
+  return array("version" => "3.0");
+}
+
+//hook_libraries_info()
+//from libraries module
+function er_libraries_info(){
+	return array(
+		"PHPExcel"=>array(
+			"name"=>"PHPExcel",
+			"vendor url"=>"http://phpexcel.codeplex.com/",
+			"download url"=>"http://phpexcel.codeplex.com/downloads/get/688493",
+			"version arguments" => array(
+        'file' => 'changelog.txt',
+        'pattern' => "/@version\s+([0-9\.]+)/",
+        'lines' => 25,
+      ),
+      'path' => 'Classes',
+      'files' => array(
+        'php' => array(
+          'PHPExcel.php',
+        ),
+      ),
+    ),
+	);
+}
+
+//helper function which attempts to find a value inside of an object or associative array, and returns a default value if nothing was found.
+function get($obj, $thing, $default=FALSE){
+	switch (gettype($obj)){
+		case 'array':
+			return isset($obj[$thing])?$obj[$thing]:$default;
+		case 'object':
+			return isset($obj->{$thing})?$obj->{$thing}:$default;
+		default:
+			return $default;
+	}
+}
+
+function er_username_alter(&$name, $account) {
+	// we do not want the email sent out to new users to have the "real name", so we return if we're creating a new acct
+	if (arg(0) == 'admin' && arg(1) == 'people' && arg(2) == 'create')
+		return;
+	
+  if (empty($account->uid)) {
+    // Don't alter anonymous users or objects that do not have any user ID.
+    return;
+  }
+
+  // Real name was loaded/generated via hook_user_load(), so re-use it.
+  if (isset($account->field_er_realname['und'][0]['value'])) {
+    if (drupal_strlen($account->field_er_realname['und'][0]['value'])) {
+      // Only if the real name is a non-empty string is $name actually altered.
+      $name = $account->field_er_realname['und'][0]['value'];
+    }
+    return;
+  }
+}
+
+/*
+ * Purpose: to detect any calls to d() "debug" function.
+ * 			If the Devel module is installed, the function dsm() is called
+ * 			This function ensures we do not receive fatal errors when moving dev code to the live site
+ * Category: Troubleshooting
+ */ 
+function d($first, $second = ''){
+  global $user;
+  if (function_exists('dpm'))
+	dpm($first, $second);
+}
+
+/*
+ * This function returns an array of all the machine names of the content types that use $fieldname
+ * 		where $fieldname is the machine name of the field.
+ * The $suffix variable is if you want to add a suffix to the end. For instance '_node_form'
+ */
+function list_cts_having_field($fieldname, $suffix = ''){
+	$ret = array();
+	$result = db_query("SELECT bundle FROM {field_config_instance} WHERE field_name = :entity", array(
+	  ':entity' => $fieldname,
+	));
+	// d($result, 'result');
+	foreach ($result as $k) {
+		$ret[] = $k->bundle . $suffix;
+		// d($k, 'k');
+	}
+	return $ret;	
+}
+
+/*
+ * Generates a nested array of date ranges corresponding to the start and end of a valid reporting period.
+ * This is primarily being used on the summary table (accomplishments.inc)
+ */
+function er_get_reporting_ranges(){
+	static $ranges = array();
+	if(!count($ranges)){//should only need to do this once
+		//provide the default ranges
+		//this code takes the start date provided in er.module file, and creates an array of date ranges.
+		//it is assumed that the reporting periods start with whatever month the grant was awarded on.
+		$start_date = variable_get('er_start_date');
+		$reporting_month = intval(variable_get('er_reporting_month'));
+		$cur_month = date('n');
+		$adjusted_date = mktime(0, 0, 0, $cur_month-$reporting_month+7);//+half a year into the future (6) +1 offset
+		$cur_year = date('Y', $adjusted_date);
+		$start_year = $start_date['year'];
+		for ($y = $cur_year; $y>=$start_year;$y--){
+			$ranges[] = _generate_reporting_range($y);
+		}
+	}
+	return $ranges;
+}
+
+//This returns a date range as a pair of unix timestamps in an array
+//If the year requested == the start year, use the exact start date rather than the standard reporting period.
+function _generate_reporting_range($year){
+	static $start_date;
+	static $reporting_month;
+	if (!isset($start_date)) $start_date = variable_get('er_start_date');
+	if (!isset($reporting_month)) $reporting_month = intval(variable_get('er_reporting_month'));
+	if ($year == $start_date['year'])
+		return array(mktime(0, 0, 0, $start_date['month'], $start_date['day'], $start_date['year']), mktime(0, 0, 0, $reporting_month, 0, $year+1));
+	else
+		return array(mktime(0, 0, 0, $reporting_month, 1, $year), mktime(0, 0, 0, $reporting_month, 0, $year+1));
+}
+
+/*
+ * Generates a nested array of date ranges corresponding to the start and end of a valid reporting period.
+ * This is used primarily on the summary table.
+ * The date values get set via the form seen on the summary table.
+ */
+function er_get_reporting_range($use_default = true){
+	drupal_session_start();
+	if (array_key_exists('er_start_date', $_SESSION) && array_key_exists('er_end_date', $_SESSION)){
+		return array($_SESSION['er_start_date'], $_SESSION['er_end_date']);
+	}else if ($use_default){
+		//$ranges = er_get_reporting_ranges();
+		//return array_shift($ranges);
+		$reporting_month = intval(variable_get('er_reporting_month'));
+		$cur_month = date('n');
+		$adjusted_date = mktime(0, 0, 0, $cur_month-$reporting_month-5);//+half a year into the past (6) +1 offset
+		$year = date('Y', $adjusted_date);
+		return _generate_reporting_range($year);//array(mktime(0, 0, 0, $reporting_month, 1, $cur_year), mktime(0, 0, 0, $reporting_month, 0, $cur_year+1));
+	}else{
+		return FALSE;
+	}
+}
+
+/*
+ * This helper function creates a download hyperlink themed with our little download icon, this is used in er_page.inc.
+ * Broke this out of er_page class because it's now also being used in theme.inc.
+ */
+function er_create_download_link($label = "", $arg = "", $options = array()){
+	$options += array(
+		'html'=>true,
+		'attributes' => array('title' => 'Download','class' => 'downloadButton')
+	);
+	if (!$arg) $arg = arg(1);
+	if (!$label) $label = "Download this page";
+	return l('<i class="icon-download-alt"></i>'.t($label), ER_ROOT_NAME."/$arg/download", $options);
+}
+
+/**
+ * DEPRECATED:: We should simply rely on the participant date range to determine the user's status.
+ * This works with EntityFieldQuery.
+ * Usage:
+ *	$efq = new EntityFieldQuery();
+ *	$efq->addTag('epscor_participant');
+ * Purpose:
+ *	This tag checks to make sure that the returned user's are all considdered participants.
+ * Criteria:
+ * 	User must be active
+ * 	User is attached to a "participating" institution
+ *  User contributes more than 160hrs/yr
+ */
+function er_query_epscor_participant_alter(QueryAlterableInterface $query) {
+	//User must be active
+	$query->condition('users.status', '1', '=');
+	
+	//Join in the institution data:
+	$query->innerJoin('field_data_field_er_inst_ref', 'inst_ref', 'users.uid = inst_ref.entity_id AND inst_ref.bundle = \'user\'');
+	$query->innerJoin('node', 'inst', 'inst.nid = inst_ref.field_er_inst_ref_target_id');
+	
+	//Institution must be "participating":
+	$query->innerJoin('field_data_field_er_inst_participating', 'participating', 'inst.nid = participating.entity_id');
+	$query->condition('participating.field_er_inst_participating_value', '1', '=');//yes, this is a participating institution
+	
+	//User must be >160hrs/yr
+	$query->innerJoin('field_data_field_er_160hours', 'one_sixty', 'users.uid = one_sixty.entity_id');
+	$query->condition('one_sixty.field_er_160hours_value', '1', '=');//Yes, user is more than 160hrs/yr
+	
+	//d($query, 'select');
+	//d((string)$query, '$query');
+}
+
+/**
+ * This works with EntityFieldQuery.
+ * Usage:
+ * 	$efq = new EntityFieldQuery();
+ * 	$efq->entityCondition('entity_type', 'user')
+				->addMetaData('participant_date_range', array([date1], [date2])); //you can use er_get_reporting_range() to get the active date range
+				->addTag('epscor_active_participant');
+ *  $result = $efq->execute();
+ * Notice:
+ * 	Dates are entered in as unix timestamps
+ * Purpose:
+ * 	It compares the user's participating date range with the date range that has been set on the summary table.
+ * 	If no date range has been selected, it checks if the person is currently participating (right now).
+ */
+function er_query_epscor_active_participant_alter(QueryAlterableInterface $query) {
+	$participant_date_field = 'field_er_participating_date';
+	$query->innerJoin('field_data_'.$participant_date_field, 'participant_date', 'users.uid = participant_date.entity_id');
+	
+	if (isset($query->alterMetaData['participant_date_range'])){
+		$range = $query->alterMetaData['participant_date_range'];
+	}else{
+		$range = er_get_reporting_range();
+	}
+	if (is_array($range) && count($range) == 2){
+		$dates = array(date('Y-m-d H:i:s', $range[0]), date('Y-m-d H:i:s', $range[1]));
+	}else{
+		$now = date('Y-m-d H:i:s');
+		$dates = array($now, $now);
+	}
+	$query->condition('participant_date.'.$participant_date_field.'_value', $dates[1], '<');
+	$or = db_or();
+		$or->isNull('participant_date.'.$participant_date_field.'_value2');
+		$or->condition('participant_date.'.$participant_date_field.'_value2', $dates[0], '>');
+	$query->condition($or);
+}
+
+//
+function er_is_user_participating($uid, $range = null){
+	$efq = new EntityFieldQuery();
+	$efq->entityCondition('entity_type', 'user')
+			->propertyCondition('uid', $uid)
+			->range(0,1);
+	if ($range)
+		$efq->addMetaData('participant_date_range', $range);
+	$efq->addTag('epscor_active_participant');
+	$result = $efq->execute();
+	return !!count($result);
+}
+
+//Predict the user's status (Participant or Collaborator) bas on the user profile.
+//The final determination must come from the participating date ranges.
+function er_predict_user_status(&$user, $verbose = false){
+	$criteria =  er_predict_user_status_get_criteria($user);
+	$participant = er_predict_user_status_from_criteria($criteria);
+	if ($verbose){
+		return array(
+			'label' => $participant?"Participant":"Collaborator",
+			'participant' => $participant,
+			'criteria' => $criteria,
+		);
+	}else
+		return $participant;
+}
+
+function er_predict_user_status_get_criteria(&$user){
+	$u = entity_metadata_wrapper('user', $user);
+	
+	$inst_nodes = $u->field_er_inst_ref->value();
+	if (count($inst_nodes)){
+		$inst = array_pop($inst_nodes);
+		$i = entity_metadata_wrapper('node', $inst);
+		$participating_inst = !!$i->field_er_inst_participating->value();
+	}else
+		$participating_inst = false;
+	
+	return (object)array(
+		'one_sixty'=>!!$u->field_er_160hours->value(),
+		'participating_inst'=>$participating_inst,
+		'paid'=>!!$u->field_er_paid->value(),
+		'paid_student'=>!!$u->field_er_faculty_any_support->value()
+	);
+}
+
+function er_predict_user_status_from_criteria($criteria){
+	return	$criteria->participating_inst &&
+					($criteria->one_sixty || $criteria->paid_student);
+}
+
+/*
+ * Menu callback for 'user/%/status'
+ * This adds a tab to the user profile.
+ * It displays info about whether the user is a participant or collaborator.
+ */
+function er_user_participating_status($uid){
+	//These should have already been defined, but supposidly not.
+	define('REQUIREMENT_INFO', -1);
+	define('REQUIREMENT_OK', 0);
+	define('REQUIREMENT_WARNING', 1);
+	define('REQUIREMENT_ERROR', 2);
+	
+	//TODO: add info about "active" participant or not using the participant date ranges.
+	
+	$user = user_load($uid);
+	$status_info = er_predict_user_status($user, true);
+	$status_criteria = $status_info['criteria'];
+	$participant = er_is_user_participating($user->uid);
+
+	$requirements = array();
+	$requirements[] = array(
+		'severity' => REQUIREMENT_INFO,
+		'title' => 'username',
+		'value' => $user->name,
+	);
+	$requirements[] = array(
+		'severity' => $status_criteria->participating_inst?REQUIREMENT_OK:REQUIREMENT_WARNING,
+		'title' => 'Participating Institution',
+		'value' => $status_criteria->participating_inst?"yes":"no",
+	);
+	$requirements[] = array(
+		'severity' => $status_criteria->one_sixty?REQUIREMENT_OK:REQUIREMENT_WARNING,
+		'title' => '> 160 hrs/year',
+		'value' => $status_criteria->one_sixty?"yes":"no",
+	);
+	$requirements[] = array(
+		'severity' => $status_criteria->paid?REQUIREMENT_OK:REQUIREMENT_WARNING,
+		'title' => 'Paid by EPSCoR',
+		'value' => $status_criteria->paid?"yes":"no",
+	);
+	$requirements[] = array(
+		'severity' => $status_criteria->paid_student?REQUIREMENT_OK:REQUIREMENT_WARNING,
+		'title' => 'Faculty with student paid by EPSCoR',
+		'value' => $status_criteria->paid_student?"yes":"no",
+	);
+	$requirements[] = array(
+		'severity' => REQUIREMENT_OK,
+		'title' => 'Expected classification',
+		'value' => $status_info['label'],
+	);
+	$requirements[] = array(
+		'severity' => ($status_info['participant'] xor $participant)?REQUIREMENT_ERROR:REQUIREMENT_OK,
+		'title' => 'Has participating date-range?',
+		'value' => $participant?'yes':'no',
+	);
+	$form['info'] = array(
+		'#markup' => '<p>This view is helpful in determining the status of this user (participant or collaborator).</p>',
+	);
+	//Display the table
+	$form['participant_status'] = array(
+		"#theme"=>"er_status_report",
+		'#requirements'=>$requirements,
+	);
+	return $form;
+}
+
+//Export a role to code
+function er_export_role($rid, $export = true){
+	if (intval($rid) > 0){
+		$return = array();
+		$return['rid'] = $rid;
+		$result =	db_select('role', 'r')
+			->fields('r', array('name'))
+			->condition('rid', $rid, '=')
+			->execute()
+			->fetchAssoc();
+		$return['name'] = $result['name'];
+		
+		//Get the permissions:
+		$query = db_select('role_permission', 'r')
+			->fields('r', array('permission'))
+			->groupBy('r.permission');
+		$query->leftJoin('role_permission', 'r2', 'r2.rid = '.$rid.' AND r.permission = r2.permission');
+		$query->addField('r2','rid','isset');
+		$results = $query->execute();
+		while($result = $results->fetchAssoc()){
+			$return['permissions'][$result['permission']] = !!$result['isset'];//true if it's set, false otherwise.
+		}
+		if ($export)
+			return array(
+					'#type'=>'textarea',
+					'#value'=>"<?php\n\$role = " . var_export($return, TRUE) . ';',
+					'#rows'=>'15',
+			);
+		return $return;
+	}else{
+		return 'Error: Bad role ID.';
+	}
+}
+
+/*
+ * This function returns a html link to the create
+ * external engagement form, and it fills out the
+ * calendar event when you provide a node id.
+ * If no node id is provided it just grabs the node id
+ * of the current page being viewed (assumed to be a calendar event)
+ * 
+ */
+function add_external_engagement_link(&$node = null){
+	if (!$node){
+		$node = menu_get_object();
+		$nid = $node->nid;
+	}
+	if ($node->type=="er_event"){
+		$n = entity_metadata_wrapper('node', $node);
+		$external = $n->field_er_event_reminders->raw();
+		if ($external){
+			$options = array(
+				'query' => array('field_er_cal_entity_reference' => $nid),
+				'html' => true
+			);
+			return l('<strong><i class="icon-list-alt"></i> Attach attendee data</strong>', 'node/add/er-engagement', $options);
+		}
+	}
+	return '';
+}
+
+/*
+ * Returns a list of content types that will be used to populate the accomplishment table.
+ */
+function er_default_accomplishment_content_types(){
+	static $default_types = array(//it apparently has to be weird like this in order for it to work well with variable_get...
+		////PARTICIPANTS
+		//"er_project"=>"er_project",
+		//"er_book"=>"er_book",
+		"er_collaboration"=>"er_collaboration",
+		"er_proposal"=>"er_proposal",
+		"er_engagement"=>"er_engagement",
+		"er_institution"=>"er_institution",
+		//"er_internet"=>"er_internet",
+		"er_other_product"=>"er_other_product",
+		"er_patent"=>"er_patent",
+		//"er_poster"=>"er_poster",
+		"er_presentation"=>"er_presentation",
+		"er_publication"=>"er_publication",
+		"er_award"=>"er_award",
+		"er_event"=>"er_event",
+		"er_news"=>"er_news",
+		"participants"=>"participants",
+	);
+	return $default_types;
+}
+
+
+///**
+// * Implements hook_field_extra_fields().
+// * This adds "Related Content" to the user-profile's display settings, allowing you to re-order it.
+// */
+//function er_field_extra_fields() {
+//  $return['user']['user'] = array(
+//    'display' => array(
+//      'related_content' => array(
+//        'label' => t('Related Content'),
+//        'description' => t('Content that the user has been attached to.'),
+//        'weight' => 5,
+//      ),
+//    ),
+//  );
+//
+//  return $return;
+//}
+//
+///**
+// * Implements hook_user_view().
+// * This works with the above hook, this is the actual output.
+// */
+//function er_user_view($account) {
+//  if (!isset($account->content['related_content'])) {
+//    $account->content['related_content'] = array();
+//  }
+//  $account->content['related_content'] += array(
+//    '#type' => 'user_profile_category',
+//    '#attributes' => array('class' => array('user-member')),
+//    '#weight' => 5,
+//    '#title' => t('Related Content'),
+//  );
+//  $account->content['related_content']['derp'] = array(
+//    '#type' => 'user_profile_item',
+//    '#title' => t('Content'),
+//    '#markup' => format_interval(REQUEST_TIME - $account->created),
+//  );
+//}
